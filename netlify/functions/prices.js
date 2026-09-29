@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 exports.handler = async () => {
+
     try {
 
         const portfolioPath = path.join(
@@ -13,33 +14,33 @@ exports.handler = async () => {
             fs.readFileSync(portfolioPath, "utf8")
         );
 
-        const ids = [
-            ...new Set(
-                Object.values(portfolio).map(p => p.id)
-            )
-        ];
+        const result = {};
 
-        const url =
-            `https://api.coingecko.com/api/v3/simple/price` +
-            `?ids=${ids.join(",")}` +
-            `&vs_currencies=usd`;
+        for (const item of Object.values(portfolio)) {
 
-        const response = await fetch(url);
+            if (result[item.id]) continue;
 
-        if (!response.ok) {
-            throw new Error(
-                `CoinGecko error ${response.status}`
+            const response = await fetch(
+                `https://api.coingecko.com/api/v3/coins/${item.id}`
             );
-        }
 
-        const data = await response.json();
+            if (!response.ok) {
+                continue;
+            }
+
+            const data = await response.json();
+
+            result[item.id] = {
+                usd: data.market_data.current_price.usd
+            };
+        }
 
         return {
             statusCode: 200,
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(data)
+            body: JSON.stringify(result)
         };
 
     } catch (err) {

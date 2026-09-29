@@ -1,67 +1,43 @@
 const fs = require("fs");
 const path = require("path");
 
-const coinCapMap = {
-    bitcoin: "bitcoin",
-    ethereum: "ethereum",
-    solana: "solana",
-    cardano: "cardano",
-    sui: "sui",
-    chainlink: "chainlink",
-    "internet-computer": "internet-computer",
-    ripple: "xrp",
-    polkadot: "polkadot",
-    dogecoin: "dogecoin",
-    "shiba-inu": "shiba-inu",
-    stellar: "stellar",
-    "hedera-hashgraph": "hedera-hashgraph"
-};
-
 exports.handler = async () => {
 
     try {
 
-        const portfolioPath = path.join(
-            process.cwd(),
-            "portfolio.json"
+        const portfolio = JSON.parse(
+            fs.readFileSync(
+                path.join(process.cwd(), "portfolio.json"),
+                "utf8"
+            )
         );
 
-        const portfolio = JSON.parse(
-            fs.readFileSync(portfolioPath, "utf8")
-        );
+        const ids = [
+            ...new Set(
+                Object.values(portfolio).map(p => p.id)
+            )
+        ];
 
         const result = {};
 
-        const response = await fetch(
-            "https://api.coincap.io/v2/assets"
-        );
+        // ELSŐ KÖRBEN CSAK 3 COIN
+        const testIds = ids.slice(0, 3);
 
-        const data = await response.json();
+        for (const id of testIds) {
 
-        const assets = {};
-        data.data.forEach(a => {
-            assets[a.id] = Number(a.priceUsd);
-        });
+            const response = await fetch(
+                `https://api.coingecko.com/api/v3/coins/${id}`
+            );
 
-        for (const p of Object.values(portfolio)) {
+            const data = await response.json();
 
-            const coinCapId = coinCapMap[p.id];
-
-            if (!coinCapId) continue;
-
-            if (assets[coinCapId]) {
-
-                result[p.id] = {
-                    usd: assets[coinCapId]
-                };
-            }
+            result[id] = {
+                usd: data.market_data.current_price.usd
+            };
         }
 
         return {
             statusCode: 200,
-            headers: {
-                "Content-Type": "application/json"
-            },
             body: JSON.stringify(result)
         };
 
@@ -73,6 +49,5 @@ exports.handler = async () => {
                 error: err.message
             })
         };
-
     }
 };

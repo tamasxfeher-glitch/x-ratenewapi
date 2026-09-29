@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 exports.handler = async () => {
+
     try {
 
         const portfolioPath = path.join(
@@ -21,37 +22,46 @@ exports.handler = async () => {
 
         const result = {};
 
-        // IDEIGLENESEN CSAK AZ ELSŐ 3 TOKEN
-        const testIds = ids.slice(0, 3);
+        for (const id of ids) {
 
-        for (const id of testIds) {
+            try {
 
-            const response = await fetch(
-                `https://api.coingecko.com/api/v3/coins/${id}`
-            );
+                const response = await fetch(
+                    `https://api.coingecko.com/api/v3/coins/${id}`
+                );
 
-            if (!response.ok) {
+                if (!response.ok) {
+                    console.log(`${id} skipped: HTTP ${response.status}`);
+                    continue;
+                }
+
+                const data = await response.json();
+
+                const usd =
+                    data?.market_data?.current_price?.usd;
+
+                if (!usd) {
+                    console.log(`${id} skipped: no price`);
+                    continue;
+                }
+
                 result[id] = {
-                    error: `HTTP ${response.status}`
+                    usd: usd
                 };
+
+                // CoinGecko rate limit védelem
+                await new Promise(r =>
+                    setTimeout(r, 1500)
+                );
+
+            } catch (err) {
+
+                console.log(
+                    `${id} skipped: ${err.message}`
+                );
+
                 continue;
             }
-
-            const data = await response.json();
-
-            result[id] = {
-                hasMarketData: !!data.market_data,
-                hasCurrentPrice: !!(
-                    data.market_data &&
-                    data.market_data.current_price
-                ),
-                usd: (
-                    data.market_data &&
-                    data.market_data.current_price
-                )
-                    ? data.market_data.current_price.usd
-                    : null
-            };
         }
 
         return {
@@ -59,7 +69,7 @@ exports.handler = async () => {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(result, null, 2)
+            body: JSON.stringify(result)
         };
 
     } catch (err) {
@@ -70,5 +80,6 @@ exports.handler = async () => {
                 error: err.message
             })
         };
+
     }
 };

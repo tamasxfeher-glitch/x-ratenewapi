@@ -14,30 +14,44 @@ exports.handler = async () => {
             fs.readFileSync(portfolioPath, "utf8")
         );
 
-        const result = {};
-
         const ids = [
             ...new Set(
                 Object.values(portfolio).map(p => p.id)
             )
         ];
 
+        const result = {};
+        const debug = [];
+
         for (const id of ids) {
 
-            const response = await fetch(
-                `https://api.coingecko.com/api/v3/coins/${id}`
-            );
+            try {
 
-            if (!response.ok) {
-                console.log(`Failed: ${id}`);
-                continue;
+                const response = await fetch(
+                    `https://api.coingecko.com/api/v3/coins/${id}`
+                );
+
+                debug.push({
+                    id,
+                    status: response.status
+                });
+
+                if (!response.ok) continue;
+
+                const data = await response.json();
+
+                result[id] = {
+                    usd: data.market_data.current_price.usd
+                };
+
+            } catch (e) {
+
+                debug.push({
+                    id,
+                    error: e.message
+                });
+
             }
-
-            const data = await response.json();
-
-            result[id] = {
-                usd: data.market_data.current_price.usd
-            };
         }
 
         return {
@@ -45,7 +59,11 @@ exports.handler = async () => {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(result)
+            body: JSON.stringify({
+                ids,
+                result,
+                debug
+            }, null, 2)
         };
 
     } catch (err) {
